@@ -104,7 +104,7 @@ class Position:
         self.closed = True
         self.pos_hist.append([window.window_end, self.current_value, self.pnl])
 
-    def get_pos_hist(self): ->DataFrame
+    def get_pos_hist(self) ->DataFrame:
         """
         Returns a time series of position value and pnl.
         """
