@@ -1,3 +1,6 @@
+import datetime
+
+
 class yf_ticker:
     def __init__(self, ticker, financials, bs, cf, info, close):
         self.ticker = ticker
