@@ -2,9 +2,23 @@ import numpy as np
 
 
 def threshold_evaluator(res: float, sign, entry_z: float = 2, exit_z: float = 0.5,
-                        emergency_z: float = 3):
+                        emergency_z: float = 3) -> str or 0:
     # l = long pair = long x short y
     # s = short pair = long y short x
+    """
+    It determines whether we will enter into a trade or we will close our position
+    Enter into a trade:
+    If we don't have an open position and the res > entry_z meaning that the diff in our pair is higher enough than the mean, we will buy the pair(sign = "l").
+    If we don't have an open position and the res < - entry_z meaning that the diff in our pair is lower enough than the mean, we will sell the pair(sign = "s").
+
+    Close position:
+    If we are long in the pair x,y and the res < exit_z (means that there was a convergence in the pair and we made profit) or
+    the res > emergency_z (means that the spread widens so we lose money and there is a possibility that the spread will not mean reverted), then
+    we return sign = 0 to close our position.
+    If we are short in the pair x,y and the res > - exit_z (means that there was a convergence in the pair and we made profit) or
+    the res < - emergency_z (means that the spread widens so we lose money and there is a possibility that the spread will not mean reverted), then
+    we return sign = 0 to close our position.
+    """
     if sign == 0 and res > entry_z:
         sign = "l"
     elif sign == 0 and res < - entry_z:
@@ -17,7 +31,14 @@ def threshold_evaluator(res: float, sign, entry_z: float = 2, exit_z: float = 0.
     return sign
 
 
-def signal_builder(scaled_residuals: np.array, max_mean_rev_time: int = 50):
+def signal_builder(scaled_residuals: np.array, max_mean_rev_time: int = 50) -> list :
+    """
+    We want to create a list with the signals of doing nothing, going long, going short, or closing an open position
+    We have predetermined that the maximum mean reversion time is 50 days
+    If we have an open trade for 50 days then we close the position because we think that there will not be a mean reversion.
+    This function calls the threshold_evaluator function and if we have consecutive days with the same sign the variable day_counter increases by 1,
+    otherwise day_counter is 0 and in the last day of the period we examine we put sign 0 to close a possible open trade.
+    """
     sign_vect = []
     sign = 0
     day_counter = 0
@@ -34,7 +55,13 @@ def signal_builder(scaled_residuals: np.array, max_mean_rev_time: int = 50):
     return sign_vect
 
 
-def pair_ret_builder(x: np.array, y: np.array, signal_vector: np.array, beta: float):
+def pair_ret_builder(x: np.array, y: np.array, signal_vector: np.array, beta: float) -> np.array:
+    """
+    It takes as input the prices of x,y, the signal vector and the beta which is needed in order to create our portfolio.
+    We first calculate the log returns of the two securities and then we calculate the return of the portfolio based on whether we are long, short, or nothing
+    in which case we have portfolio return = 0.
+    We also take into consideration the beta(coeficient of cointegration).
+    """
     r_x = np.log(x[1:]) - np.log(x[:-1])
     r_y = np.log(y[1:]) - np.log(y[:-1])
     r_p = [beta * rx - ry if sig == "l" else ry - beta * rx if sig == "s" else 0
