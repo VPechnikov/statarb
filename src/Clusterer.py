@@ -24,7 +24,33 @@ class Clusterer:
 
         self.cluster_history = []
 
-    def dbscan(self, today: date, min_samples, eps=None, window=None):
+    def dbscan(self, today: date, min_samples, eps=None, window=None)->dict:
+        """
+        It takes as parameters:
+        today: is the today date
+        min_samples: is an int. The minimum number of points to define a cluster
+        eps: is an int. The maximum distance for two points to be considered as close points
+        window: is an object of the class Window. Here the get_data function of window is used for collecting the data
+        for SnP and ETFs. This data is in Dataframe type.
+
+        The function:
+        1)assigns the intraday volatility and the volume for SNP's all stocks to snp_to_cluster_on dataframe. It does
+        the same for ETFs.
+        2)Concatenates the two dataframes into one with one exception: in case of different lengths, only the common
+        dates are used.
+        3)Calculates the mean of each SNP's stock volatility over time and the mean of each SNP's stock volume over time.
+        It does the same for ETFs.
+        4)Ranks the volatilities in ascending order and assigns the result in the ranked_mean_intraday_vols.
+        5)Ranks the volumes in ascending order and assigns the result in the volumes.
+        6)Normalises the results both for volatilities and for volumes.
+        7)Reconcatenates the results into one dataframe X.
+        8)Performs the dbscan algorithm in order to create the clusters.
+        9)Takes the tickers in each cluster(label) and puts them as values to the dict clusters. Takes the labels(0,1,2)
+        as the keys.
+        10)Returns the dict clusters.
+
+        """
+
         self.window = window
 
         clustering_features = [Features.INTRADAY_VOL, Features.VOLUME]
