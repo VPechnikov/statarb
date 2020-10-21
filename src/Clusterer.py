@@ -24,7 +24,7 @@ class Clusterer:
 
         self.cluster_history = []
 
-    def dbscan(self, today: date, min_samples, eps=None, window=None)->dict:
+    def dbscan(self, today: date, min_samples, eps=None, window=None)->dict[int:list]:
         """
         It takes as parameters:
         today: is the today date
