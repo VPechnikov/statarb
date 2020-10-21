@@ -17,8 +17,8 @@ class Window:
                  trading_win_len: timedelta,
                  repository: DataRepository):
 
-        # Window object contains information about timings for the window as well as SNP and ETF data for that period.
-        # After construction of the object we also have self.etf_data nd self.snp_data and the live tickers for each
+        """Window object contains information about timings for the window as well as SNP and ETF data for that period.
+        After construction of the object we also have self.etf_data nd self.snp_data and the live tickers for each"""
 
         self.window_start: date = window_start
         self.window_length: timedelta = trading_win_len
@@ -28,8 +28,8 @@ class Window:
         self.lookback_win_dates = self.__get_window_trading_days(window_start, trading_win_len)
         self.__update_window_data(self.lookback_win_dates)
 
-    def __get_window_trading_days(self, window_start: date, window_length: timedelta):
-
+    def __get_window_trading_days(self, window_start: date, window_length: timedelta) -> List[date]:
+        """the function returns a list of trading days by calling DataRepository.py"""
         start_idx = None
         for idx, d in enumerate(self.repository.all_dates):
             if self.repository.check_date_equality(window_start, d):
@@ -45,8 +45,14 @@ class Window:
         return window_trading_days
 
     def __update_window_data(self, trading_dates_to_get_data_for: List[date]):
+        """
+        The function creates two new attribute of the window instance, namely self.etf_data and self.snp_data.
+        It assigns them the DataFrame outputted from DataRepository.remove_dead_tickers().
+        It first checks if any data has ever been uploaded, if not - uploads it from the disk.
+        Then, if the window ends after  ETF or SNP data's last day, it loads the data for the next window_len days.
 
-        trading_dates_to_get_data_for = sorted(set(trading_dates_to_get_data_for)) # no duplicates
+        """
+        trading_dates_to_get_data_for = sorted(set(trading_dates_to_get_data_for))  # no duplicates
 
         if self.repository.all_data[Universes.SNP] is None or\
                 self.repository.all_data[Universes.ETFs] is None:
@@ -69,11 +75,15 @@ class Window:
         lookback_temp_etf_data = self.repository.all_data[Universes.ETFs].loc[trading_dates_to_get_data_for]
         lookback_temp_snp_data = self.repository.all_data[Universes.SNP].loc[trading_dates_to_get_data_for]
 
+        # the "_" below is used to ignore the first value of the output of remove_dead_tickers()
         _, self.etf_data = self.repository.remove_dead_tickers(Universes.ETFs, lookback_temp_etf_data)
         _, self.snp_data = self.repository.remove_dead_tickers(Universes.SNP, lookback_temp_snp_data)
 
     def roll_forward_one_day(self) -> None:
-
+        """
+        The function shifts the window to the next day. It then updates the window data by calling
+        self.__update_window_data
+        """
         self.window_start = self.__get_nth_working_day_ahead(self.window_start, 1)
         self.window_end = self.__get_nth_working_day_ahead(self.window_end, 1)
 
@@ -96,7 +106,7 @@ class Window:
                  tickers: Optional[List[Tickers]] = None,
                  features: Optional[List[Features]] = None) -> DataFrame:
 
-        '''
+        """
         function to get data, with tickers and features specified
 
         universe: Universe.SNP or Universe.ETFs
@@ -124,7 +134,7 @@ class Window:
                                     tickers = [EtfTickers.FITE , EtfTickers.ARKW],
                                     features = [EtfFeatures.BID, EtfFeatures.LOW]
 
-        '''
+        """
 
         if tickers is None and features is None:
             if universe is Universes.SNP:
