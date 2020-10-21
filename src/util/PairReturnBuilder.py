@@ -60,7 +60,7 @@ def pair_ret_builder(x: np.array, y: np.array, signal_vector: np.array, beta: fl
     It takes as input the prices of x,y, the signal vector and the beta which is needed in order to create our portfolio.
     We first calculate the log returns of the two securities and then we calculate the return of the portfolio based on whether we are long, short, or nothing
     in which case we have portfolio return = 0.
-    We also take into consideration the beta coeficient of x which shows the sensitivity of y in changes of x.
+    We also take into consideration the beta(coeficient of cointegration).
     """
     r_x = np.log(x[1:]) - np.log(x[:-1])
     r_y = np.log(y[1:]) - np.log(y[:-1])
