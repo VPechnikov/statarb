@@ -26,7 +26,7 @@ class Portfolio:
         maximum active pairs = 10
         rebalance threshold = 1
         empty current position list and historical position list
-        0 active paris, active portfolio value, realised pnl, log return and cummulative return
+        0 active paris, active portfolio value, realised pnl, log return and cumulative return
         port_hist = [[window, cash, 0, cash, 0, 0, 0, 0]]
         """
         # port_value: value of all the positions we have currently
@@ -72,14 +72,14 @@ class Portfolio:
 
         suppose that we have found a cointegrated pair and want to open a position for it
         start from an initialised position and then update attributes of this position
-        firstly, we have intial cash
+        firstly, we have initial cash
         calculate the amount of cash need to be dedicated to this pair according to its weights
-        get current prices and find out quantities of each assets that we can hold, they are intergers
+        get current prices and find out quantities of each assets that we can hold, they are integers
         with these quantities, we can work out asset values and actual needed cash, and this is the current position value
         to open a position, there is a commission fee to be paid from our current cash
 
         check if current cash is enough to open this position
-        ie. curent cash >= pair_dedicated_cash + commission
+        ie. current cash >= pair_dedicated_cash + commission
         if not enough, we cannot open this position
         we also need to check if number of active pairs has already achieved the maximum,
         if true, then we cannot open this position.
@@ -224,15 +224,27 @@ class Portfolio:
                     self.close_position(decision.position)
 
     def get_current_positions(self):
+        '''
+        return the list consists of all current positions
+        '''
         return self.cur_positions
 
     def get_hist_positions(self):
+        '''
+        return the list consists of all history positions
+        '''
         return self.hist_positions
 
     def get_cash_balance(self):
+        '''
+        return the list consists the current balance of cash
+        '''
         return self.cur_cash
 
     def get_port_summary(self):
+        '''
+        Creat and print a sheet made up of assets' name, quantities, and profit or loss.
+        '''
         data = list()
         for pair in self.cur_positions:
             data.append([pair.asset1, pair.quantity1, pair.asset2, pair.quantity2, pair.pnl])
@@ -251,8 +263,10 @@ class Portfolio:
         return [self.cur_cash, df, self.realised_pnl]
 
     def get_port_hist(self):
-        # returns a time series of cash balance, portfolio value and actual pnl
-        pd.set_option('expand_frame_repr', False)
+        '''
+        returns a time series of cash balance, portfolio value and actual pnl
+        '''
+        pd.set_option('expand_frame_repr', False) # Line Transforming is not allowed.
         df = DataFrame(self.port_hist, columns=['date', 'cash', 'port_value', 'total_capital',
                                                 'realised_pnl', 'return',
                                                 'cum_return', 'active_pairs'])
@@ -261,7 +275,10 @@ class Portfolio:
         return df.round(2)
 
     def summary(self):
-        prc_hist = self.get_port_hist()['total_capital']
+        '''
+
+        '''
+        prc_hist = self.get_port_hist()['total_capital'] #time series of historic positions
         date_parser = lambda x: datetime.strptime(x, '%d/%m/%Y')
 
         yearly_to_daily = lambda x: x / 365
@@ -275,7 +292,7 @@ class Portfolio:
         tbill.index += timedelta(1)
         tbill_mean = tbill.loc[tbill.index.intersection(prc_hist.index)].mean().values
 
-        print(get_performance_stats(prc_hist, tbill_mean))
+        print(get_performance_stats(prc_hist, tbill_mean)) # a transpose, tbill_mean used as riskfree rate
 
         all_history = self.get_port_hist()
         sp = yf.download("^GSPC", start=min(all_history.index), end=max(all_history.index))[["Adj Close"]]["Adj Close"]
@@ -283,7 +300,7 @@ class Portfolio:
         all_history.index = [i.date() for i in all_history.index]
         sp.index = [i.date() for i in sp.index]
 
-        common_dates = sorted(set(sp.index).intersection(set(all_history.index)))
+        common_dates = sorted(set(sp.index).intersection(set(all_history.index))) #intersection of sp and all_history
 
         sp = sp[common_dates]
         all_history = all_history[all_history.index.isin(common_dates)]
