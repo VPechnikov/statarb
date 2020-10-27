@@ -19,6 +19,16 @@ class Portfolio:
 
     def __init__(self, cash: float, window: Window,
                  logger: Logger, max_active_pairs: float = 10):
+        """
+        Initialise a portfolio:
+        cash
+        window
+        maximum active pairs = 10
+        rebalance threshold = 1
+        empty current position list and historical position list
+        0 active paris, active portfolio value, realised pnl, log return and cummulative return
+        port_hist = [[window, cash, 0, cash, 0, 0, 0, 0]]
+        """
         # port_value: value of all the positions we have currently
         # cur_positions: list of all current positions
         # hist_positions: list of all positions (both historical and current)
@@ -40,7 +50,7 @@ class Portfolio:
         self.current_window: Window = window
         self.port_hist = list()
         self.rebalance_threshold = float(1)
-        self.loading = float(0.1)
+        self.loading = float(0.1) #proportion of cash dedicated to each pair
         self.number_active_pairs = 0
         self.max_active_pairs = max_active_pairs
 
@@ -57,7 +67,33 @@ class Portfolio:
 
     def open_position(self,
                       position: Position):
+        """
+        Parameter: class - Position
 
+        suppose that we have found a cointegrated pair and want to open a position for it
+        start from an initialised position and then update attributes of this position
+        firstly, we have intial cash
+        calculate the amount of cash need to be dedicated to this pair according to its weights
+        get current prices and find out quantities of each assets that we can hold, they are intergers
+        with these quantities, we can work out asset values and actual needed cash, and this is the current position value
+        to open a position, there is a commission fee to be paid from our current cash
+
+        check if current cash is enough to open this position
+        ie. curent cash >= pair_dedicated_cash + commission
+        if not enough, we cannot open this position
+        we also need to check if number of active pairs has already achieved the maximum,
+        if true, then we cannot open this position.
+        only if we have enough cash and this portfolio doesn't have maximum number of active pairs,
+        we can open this position.
+        logger information: asset1 and asset2 are cointegrated and zscore is in trading range. opening position...
+        number of active pairs increases by 1
+        record this position as current position and append it into historical position list
+        current cash will reduce by pair dedicated cash and commision fee
+        active portforlio value will increase by this pair value ie pair dedicated cash
+        logger information: asset1: name, current price, quantity, value
+        asset 2: name, current price, quantity, value
+        cash balance: current cash
+        """
         cur_price = self.current_window.get_data(universe=Universes.SNP,
                                                  tickers=[position.asset1, position.asset2],
                                                  features=[Features.CLOSE])
@@ -93,6 +129,23 @@ class Portfolio:
             self.logger.info('Cash balance: $%s', self.cur_cash)
 
     def close_position(self, position: Position):
+        """
+        Parameter: class - Position
+
+        if we want to close a position,
+        check if this position is currently open,
+        if it is open, then we close it.
+        logger information: Closing/emergency threshold is passed for active pair asset1,asset2. Closing position...
+        then the number of active pairs will decrease by 1
+        and remove this position from current position
+        calculate pair value by adding two asset values according to current prices and quantities we held
+        also a commission fee is needed
+        update pnl = pnl at the end of previous window + pair value - pair value at beginning of window - commision
+        update current cash, active portfoliovalue, realised pnl
+        logger information: Asset 1: name, current price, quantity
+        Asset 2: name, current price, quantity
+        Realised PnL for position: pnl
+        """
         cur_price = self.current_window.get_data(universe=Universes.SNP,
                                                  tickers=[position.asset1, position.asset2],
                                                  features=[Features.CLOSE])
@@ -120,10 +173,19 @@ class Portfolio:
             self.logger.info('Realised PnL for position: %s' % round(position.pnl, 2))
 
     def generate_commission(self, asset1_value, asset2_value):
-        # transaction costs as % of notional amount
+        """
+        transaction costs as % of notional amount
+        """
         return self.t_cost * (abs(asset1_value) + abs(asset2_value))
 
     def update_portfolio(self, today: date):
+        """
+        find current pair value for each pair in portfolio,
+        add them together to get current portfolio value.
+        compute sctive portfolio calue, total capital, log return and cumulative return
+        record updated portfolio data into historial portfolio list
+        print: total capital, cumulative return
+        """
         cur_port_val = 0
 
         for pair in self.cur_positions:
@@ -146,6 +208,13 @@ class Portfolio:
         print(f"Total Capital: {self.total_capital[-1]:.4f}\tCum Return: {self.cum_return:4f}")
 
     def execute_trades(self, decisions):
+        """
+        decisions - class?
+        for each decision,
+        check if new action is different from old action,
+        then if old action is not_invested, then new action should be invest it, so we open position
+        if new action is not_invested, this means that we decide to close position.
+        """
         self.logger.info(f"Executing trades for {self.current_window.window_end.strftime('%Y-%m-%d')}")
         for decision in decisions:
             if decision.old_action is not decision.new_action:
