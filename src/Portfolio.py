@@ -27,7 +27,7 @@ class Portfolio:
         rebalance threshold = 1
         empty current position list and historical position list
         0 active paris, active portfolio value, realised pnl, log return and cumulative return
-        port_hist = [[window, cash, 0, cash, 0, 0, 0, 0]]
+        port_hist = [[date, cash, 0, cash, 0, 0, 0, 0]]
         """
         # port_value: value of all the positions we have currently
         # cur_positions: list of all current positions
@@ -70,12 +70,10 @@ class Portfolio:
         """
         Parameter: class - Position
 
-        suppose that we have found a cointegrated pair and want to open a position for it
         start from an initialised position and then update attributes of this position
-        firstly, we have initial cash
         calculate the amount of cash need to be dedicated to this pair according to its weights
         get current prices and find out quantities of each assets that we can hold, they are integers
-        with these quantities, we can work out asset values and actual needed cash, and this is the current position value
+        with integer quantities, we can work out asset values and actual needed cash, and this is the current position value
         to open a position, there is a commission fee to be paid from our current cash
 
         check if current cash is enough to open this position
@@ -85,14 +83,9 @@ class Portfolio:
         if true, then we cannot open this position.
         only if we have enough cash and this portfolio doesn't have maximum number of active pairs,
         we can open this position.
-        logger information: asset1 and asset2 are cointegrated and zscore is in trading range. opening position...
-        number of active pairs increases by 1
         record this position as current position and append it into historical position list
-        current cash will reduce by pair dedicated cash and commision fee
-        active portforlio value will increase by this pair value ie pair dedicated cash
-        logger information: asset1: name, current price, quantity, value
-        asset 2: name, current price, quantity, value
-        cash balance: current cash
+        current cash will reduce by pair dedicated cash and commission fee
+        active portfolio value will increase by this pair value
         """
         cur_price = self.current_window.get_data(universe=Universes.SNP,
                                                  tickers=[position.asset1, position.asset2],
@@ -108,7 +101,7 @@ class Portfolio:
         pair_dedicated_cash = asset1_value + asset2_value
         position.set_position_value(pair_dedicated_cash)
 
-        if pair_dedicated_cash > self.cur_cash:
+        if pair_dedicated_cash > self.cur_cash: #?
             self.logger.info('No sufficient cash to open position')
         elif self.number_active_pairs >= self.max_active_pairs:
             pass
@@ -135,16 +128,11 @@ class Portfolio:
         if we want to close a position,
         check if this position is currently open,
         if it is open, then we close it.
-        logger information: Closing/emergency threshold is passed for active pair asset1,asset2. Closing position...
         then the number of active pairs will decrease by 1
         and remove this position from current position
         calculate pair value by adding two asset values according to current prices and quantities we held
         also a commission fee is needed
-        update pnl = pnl at the end of previous window + pair value - pair value at beginning of window - commision
-        update current cash, active portfoliovalue, realised pnl
-        logger information: Asset 1: name, current price, quantity
-        Asset 2: name, current price, quantity
-        Realised PnL for position: pnl
+        update pair residual cash, pnl, current cash, active portfolio value, realised pnl
         """
         cur_price = self.current_window.get_data(universe=Universes.SNP,
                                                  tickers=[position.asset1, position.asset2],
@@ -180,11 +168,10 @@ class Portfolio:
 
     def update_portfolio(self, today: date):
         """
-        find current pair value for each pair in portfolio,
+        for each active pair in portfolio, find current pair value,
         add them together to get current portfolio value.
-        compute sctive portfolio calue, total capital, log return and cumulative return
-        record updated portfolio data into historial portfolio list
-        print: total capital, cumulative return
+        compute total capital, log return and cumulative return
+        record updated portfolio data into historical portfolio list
         """
         cur_port_val = 0
 
@@ -224,27 +211,29 @@ class Portfolio:
                     self.close_position(decision.position)
 
     def get_current_positions(self):
-        '''
+        """
         return the list consists of all current positions
-        '''
+        """
         return self.cur_positions
 
     def get_hist_positions(self):
-        '''
+        """
         return the list consists of all history positions
-        '''
+        """
         return self.hist_positions
 
     def get_cash_balance(self):
-        '''
+        """
         return the list consists the current balance of cash
-        '''
+        """
         return self.cur_cash
 
     def get_port_summary(self):
-        '''
+        """
         Creat and print a sheet made up of assets' name, quantities, and profit or loss.
-        '''
+        df is a dataframe which includes information (assets, quantity and pnl) about all pairs in portfolio.
+        print summary including current cash balance, df and realised pnl.
+        """
         data = list()
         for pair in self.cur_positions:
             data.append([pair.asset1, pair.quantity1, pair.asset2, pair.quantity2, pair.pnl])
@@ -263,9 +252,9 @@ class Portfolio:
         return [self.cur_cash, df, self.realised_pnl]
 
     def get_port_hist(self):
-        '''
+        """
         returns a time series of cash balance, portfolio value and actual pnl
-        '''
+        """
         pd.set_option('expand_frame_repr', False) # Line Transforming is not allowed.
         df = DataFrame(self.port_hist, columns=['date', 'cash', 'port_value', 'total_capital',
                                                 'realised_pnl', 'return',
@@ -275,10 +264,11 @@ class Portfolio:
         return df.round(2)
 
     def summary(self):
-        '''
-
-        '''
-        prc_hist = self.get_port_hist()['total_capital'] #time series of historic positions
+        """
+        print performance of our portfolio
+        plot normalised historical total capital and normalised sp500 
+        """
+        prc_hist = self.get_port_hist()['total_capital'] #time series of total capital
         date_parser = lambda x: datetime.strptime(x, '%d/%m/%Y')
 
         yearly_to_daily = lambda x: x / 365
@@ -291,8 +281,8 @@ class Portfolio:
 
         tbill.index += timedelta(1)
         tbill_mean = tbill.loc[tbill.index.intersection(prc_hist.index)].mean().values
-
-        print(get_performance_stats(prc_hist, tbill_mean)) # a transpose, tbill_mean used as riskfree rate
+        # calculate the mean of risk-free rate for dates when we have historical record of portfolio
+        print(get_performance_stats(prc_hist, tbill_mean)) # a transpose, tbill_mean used as risk-free rate
 
         all_history = self.get_port_hist()
         sp = yf.download("^GSPC", start=min(all_history.index), end=max(all_history.index))[["Adj Close"]]["Adj Close"]
