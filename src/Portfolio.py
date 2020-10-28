@@ -265,8 +265,8 @@ class Portfolio:
 
     def summary(self):
         """
-        print performance of our portfolio
-        plot normalised historical total capital and normalised sp500 
+        print performance of our portfolio (dataframe containing stats of total capital)
+        plot normalised historical total capital and normalised sp500
         """
         prc_hist = self.get_port_hist()['total_capital'] #time series of total capital
         date_parser = lambda x: datetime.strptime(x, '%d/%m/%Y')
