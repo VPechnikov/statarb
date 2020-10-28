@@ -275,9 +275,6 @@ class Portfolio:
         return df.round(2)
 
     def summary(self):
-        '''
-
-        '''
         prc_hist = self.get_port_hist()['total_capital'] #time series of historic positions
         date_parser = lambda x: datetime.strptime(x, '%d/%m/%Y')
 

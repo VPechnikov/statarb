@@ -73,6 +73,7 @@ def get_performance_stats(prices, rf):
 	# Maximum Drawdown defined here as POSITIVE proportional loss from peak (notation is sometimes NEGATIVE)
 
 	stats['MDD'] = 1 - prices[end_mdd] / prices[start_mdd]  # (same as P_start - P_end) / P_start
+	#?
 	stats['Peak date'] = start_mdd.date()
 	stats['Trough date'] = end_mdd.date()
 
