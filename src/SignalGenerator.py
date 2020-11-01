@@ -6,7 +6,9 @@ from datetime import date, timedelta
 from src.Filters import Filters
 
 class Decision:
-    def __init__(self, position: Position, old_action: PositionType, new_action: PositionType):
+    def __init__(self, position: Position,
+                 old_action: PositionType,
+                 new_action: PositionType):
         self.position: Position = position
         self.new_action: PositionType = new_action
         self.old_action: PositionType = old_action

@@ -129,7 +129,7 @@ class Cointegrator:
                     mu_x_ann = float(250 * np.mean(r_x))
                     sigma_x_ann = float(250 ** 0.5 * np.std(r_x))
                     ou_mean, ou_std, ou_diffusion_v, recent_dev, recent_dev_scaled = self.__ou_params(residuals)
-                    scaled_beta = beta / (beta - 1)
+                    scaled_beta = beta / (beta - 1) #??????
                     recent_dev_scaled_hist = [recent_dev_scaled]
                     cointegration_rank = self.__score_coint(adf_test_statistic, self.adf_confidence_level,
                                                             adf_critical_values, he_test, hurst_exp_threshold, 10)

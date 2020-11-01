@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import Dict
 
 pd.options.display.max_columns = None
 pd.options.display.max_rows = None
@@ -24,7 +25,7 @@ class Clusterer:
 
         self.cluster_history = []
 
-    def dbscan(self, today: date, min_samples, eps=None, window=None)->dict[int:list]:
+    def dbscan(self, today: date, min_samples, eps=None, window=None) -> Dict[int:list]:
         """
         It takes as parameters:
         today: is the today date
