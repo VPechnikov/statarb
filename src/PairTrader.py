@@ -97,7 +97,7 @@ class PairTrader:
 
                 is_window_end_or_halfway = \
                     (self.day_count % self.window_length.days) == (0 or int(self.window_length.days / 2))
-
+                print("Window end or halfway: ", is_window_end_or_halfway)
 
                 if is_window_end_or_halfway or self.last_traded_date is None:
                     print("Clustering...")
@@ -112,11 +112,12 @@ class PairTrader:
                 # O((m+n)^2) to O(mn)
                 else:
                     cointegrated_pairs = self.cointegrator.get_previous_cointegrated_pairs(self.current_window)
-
+                print("Making decisions...")
                 decisions = self.dm.make_decision(cointegrated_pairs)
                 self.last_traded_date = self.today
+                print("Executing...")
                 self.portfolio.execute_trades(decisions)
-
+            print("Evolving...")
             self.__evolve()
 
         self.portfolio.get_port_hist().to_csv('backtest_results' + self.portfolio.timestamp)

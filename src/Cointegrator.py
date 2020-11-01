@@ -83,8 +83,6 @@ class Cointegrator:
         If cointegrated, we increase the number of cointegrated pairs and creates an instance of a cointegrated pair
         with the required attributes
         Updates Cointegrator.previous_cointegrated_pairs and returns a list of Cointegrated Pairs
-
-
         """
         # run cointegration_analysis on all poss combinations of pairs within the same cluster
 
@@ -93,6 +91,13 @@ class Cointegrator:
         tickers_per_cluster = [i for i in clustering_results.values()]
 
         for cluster in tickers_per_cluster:
+            #FOR YOU BOYS
+            # l_ETF = [....]
+            # l_SNP = [....]
+            # for etf in l_etf:
+            #   for stock in l_SNP:
+            #      pair = (etf,stock)
+
             for pair in itertools.combinations(list(cluster), 2):  # runs through every pair within the cluster
 
                 t1 = current_window.get_data(universe=Universes.SNP,

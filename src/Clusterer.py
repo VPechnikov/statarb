@@ -1,9 +1,12 @@
 import numpy as np
 import pandas as pd
-from typing import Dict
+from typing import Dict, Tuple
+
 
 pd.options.display.max_columns = None
 pd.options.display.max_rows = None
+
+from src.util.Tickers import Tickers
 from sklearn.cluster import DBSCAN
 from src.DataRepository import Universes
 from src.util.Features import Features
@@ -25,7 +28,7 @@ class Clusterer:
 
         self.cluster_history = []
 
-    def dbscan(self, today: date, min_samples, eps=None, window=None) -> Dict[int:list]:
+    def dbscan(self, today: date, min_samples, eps=None, window=None) -> Dict[int, Tuple[Tuple[Tickers]]]:
         """
         It takes as parameters:
         today: is the today date
