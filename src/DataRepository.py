@@ -114,6 +114,8 @@ class DataRepository:
         This is because we now read for only the next 1 windows worth, calculate features, and then
         append it to the current dataframes
         '''
+        print(f'Getting data for dates {", ".join(str(d) for d in trading_dates)} in universe {datatype}')
+
         # the method below can be improved
         idxs_to_read = []
         for d1 in trading_dates:

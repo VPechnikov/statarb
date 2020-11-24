@@ -12,6 +12,7 @@ from src.RiskManager import RiskManager
 from src.SignalGenerator import SignalGenerator
 from src.Window import Window
 
+
 class PairTrader:
 
     def __init__(self,
@@ -19,13 +20,13 @@ class PairTrader:
                  target_number_of_coint_pairs: int = 100,
                  backtest_start: date = date(2008, 1, 2),
                  max_active_pairs: float = 10,
-                 trading_window_length: timedelta = timedelta(days=90),
-                 trading_freq: timedelta = timedelta(days=1),
+                 trading_window_length: timedelta = timedelta(days=90), #why 90?
+                 trading_freq: timedelta = timedelta(days=1), #can we trade daily?
                  backtest_end: Optional[date] = None,
                  adf_confidence_level: AdfPrecisions = AdfPrecisions.FIVE_PCT,
-                 max_mean_rev_time: int = 15,
+                 max_mean_rev_time: int = 15, # in other files it is 30-50 days
                  hurst_exp_threshold: float = 0.20,
-                 entry_z: float = 1.5,
+                 entry_z: float = 1.5, #the other file has it at 2
                  emergency_delta_z: float = 3,
                  exit_z: float = 0.5):
         # If end_date is None, run for the entirety of the dataset
@@ -47,13 +48,13 @@ class PairTrader:
 
         # if the pair crosses this boundary, we don't believe their cointegrated anymore
         # - close the position at a loss
-        # require: emergency_z+entry_z > entry_z > exit_z
+        # require: emergency_delta_z+entry_z > entry_z > exit_z
         self.emergency_delta_z: float = emergency_delta_z
 
         # Last SNP date, hard coded for now...
-        self.backtest_end = date(year=2020, month=12, day=31) if backtest_end is None else backtest_end
+        self.backtest_end = date(year=2020, month=6, day=30) if backtest_end is None else backtest_end
 
-        self.repository = DataRepository(trading_window_length)
+        self.repository = DataRepository(trading_window_length) #do we really need to have DataRepo and Window separately?
 
         self.current_window: Window = Window(window_start=backtest_start,
                                              trading_win_len=trading_window_length,
@@ -61,13 +62,13 @@ class PairTrader:
 
         self.today = self.current_window.lookback_win_dates[-1]
         self.day_count: int = 0
-        self.last_traded_date: Optional[date] = None
+        self.last_traded_date: Optional[date] = None #???
 
         self.clusterer = Clusterer()
         self.cointegrator = Cointegrator(self.repository,
                                          target_number_of_coint_pairs,
                                          self.adf_confidence_level,
-                                         self.max_mean_rev_time,
+                                         self.max_mean_rev_time, # where is the Hurst Exponent Threshold?
                                          self.entry_z,
                                          self.exit_z,
                                          previous_cointegrated_pairs=[])
@@ -75,12 +76,15 @@ class PairTrader:
         self.risk_manager = RiskManager(self.entry_z,
                                         self.exit_z)
         self.filters = Filters()
-        self.portfolio: Portfolio = Portfolio(100_000, self.current_window, max_active_pairs=self.max_active_pairs,
+        self.portfolio: Portfolio = Portfolio(cash=100_000,
+                                              window=self.current_window,
+                                              max_active_pairs=self.max_active_pairs,
                                               logger=self.logger)
-        self.dm = SignalGenerator(self.portfolio,
-                                  entry_z,
-                                  exit_z,
-                                  emergency_delta_z)
+
+        self.dm = SignalGenerator(port = self.portfolio,
+                                  entry_z=entry_z,
+                                  exit_z=exit_z,
+                                  emergency_delta_z=emergency_delta_z)
 
     def trade(self):
         while self.today < self.backtest_end:
@@ -89,10 +93,11 @@ class PairTrader:
                   f"Win End: {self.current_window.window_end.strftime('%Y-%m-%d')}\n")
 
             if self.last_traded_date is None \
-                    or ((self.today - self.last_traded_date).days % self.trading_freq.days == 0):
+                    or ((self.today - self.last_traded_date).days % self.trading_freq.days == 0): #only makes sense if trading freq is >1
 
-                is_window_end_or_halfway = (self.day_count % self.window_length.days) == \
-                                           (0 or int(self.window_length.days / 2))
+                is_window_end_or_halfway = \
+                    (self.day_count % self.window_length.days) == (0 or int(self.window_length.days / 2))
+                print("Window end or halfway: ", is_window_end_or_halfway)
 
                 if is_window_end_or_halfway or self.last_traded_date is None:
                     print("Clustering...")
@@ -100,15 +105,19 @@ class PairTrader:
                     print("Cointegrating...")
                     cointegrated_pairs = self.cointegrator.generate_pairs(clusters,
                                                                           self.hurst_exp_threshold,
-                                                                          self.current_window)
+                                                                          self.current_window) #Valentin fix pls
 
+                # we make an assumption that they are still co-integrated. Need to check
+                # change the cointegrater to look only for SNP/ETF pairs to reduce the running time from
+                # O((m+n)^2) to O(mn)
                 else:
                     cointegrated_pairs = self.cointegrator.get_previous_cointegrated_pairs(self.current_window)
-
+                print("Making decisions...")
                 decisions = self.dm.make_decision(cointegrated_pairs)
                 self.last_traded_date = self.today
+                print("Executing...")
                 self.portfolio.execute_trades(decisions)
-
+            print("Evolving...")
             self.__evolve()
 
         self.portfolio.get_port_hist().to_csv('backtest_results' + self.portfolio.timestamp)
@@ -125,7 +134,6 @@ class PairTrader:
 
 
 if __name__ == '__main__':
-
     start_time = time.time()
     logging.basicConfig(filename='log' + datetime.now().strftime("%Y%M%d%H%M%S"),
                         filemode='a',

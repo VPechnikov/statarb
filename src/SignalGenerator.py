@@ -6,7 +6,9 @@ from datetime import date, timedelta
 from src.Filters import Filters
 
 class Decision:
-    def __init__(self, position: Position, old_action: PositionType, new_action: PositionType):
+    def __init__(self, position: Position,
+                 old_action: PositionType,
+                 new_action: PositionType):
         self.position: Position = position
         self.new_action: PositionType = new_action
         self.old_action: PositionType = old_action
@@ -32,6 +34,18 @@ class SignalGenerator:
         self.volumn_shock_filter = 0
 
     def make_decision(self, pairs: List[CointegratedPair]) ->List[Decision]:
+        """
+        The function:
+        -Creates 2 lists: one with the tickers of the cointegrated pairs and one with the tickers of current position pairs
+        -Iterates through cointegrated pairs and checks if there are pairs which are closed and must be open(conditions
+        about reaching the threshold point and possible existence of volume shock must hold). If so, open positions
+        -Iterates through current positions and checks if there are pairs which are no longer cointegrated. In this case,
+        we close these positions
+        -Closes the positions which are profitable after the time limit
+        -Closes the positions which have reached either the emergency point(loss) or the exit point(profit) at any time
+        -Keeps open the remaining positions
+        -Returns a list with decisions for each pair(contains old action and new action on the pair)
+        """
 
         positions = self.port.cur_positions
         current_posn_pairs = [(i.asset1, i.asset2) for i in positions]

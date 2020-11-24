@@ -17,7 +17,6 @@ from src.util.Tickers import Tickers
 from src.util.util import get_universe_from_ticker
 
 
-
 class CointegratedPair:
 
     def __init__(self,
@@ -76,7 +75,15 @@ class Cointegrator:
 
     def generate_pairs(self,
                        clustering_results: Dict[int, Tuple[Tuple[Tickers]]],
-                       hurst_exp_threshold: float, current_window: Window):
+                       hurst_exp_threshold: float, current_window: Window) -> List[CointegratedPair]:
+        """
+        The function generates pairs by considering every combination of 2 elements of a cluster.
+        Then it regresses one on the other to determine beta, residuals and regression output
+        Then it performs the three tests on this pair
+        If cointegrated, we increase the number of cointegrated pairs and creates an instance of a cointegrated pair
+        with the required attributes
+        Updates Cointegrator.previous_cointegrated_pairs and returns a list of Cointegrated Pairs
+        """
         # run cointegration_analysis on all poss combinations of pairs within the same cluster
 
         current_cointegrated_pairs = []
@@ -84,8 +91,14 @@ class Cointegrator:
         tickers_per_cluster = [i for i in clustering_results.values()]
 
         for cluster in tickers_per_cluster:
-            for pair in itertools.combinations(list(cluster), 2):
+            #FOR YOU BOYS
+            # l_ETF = [....]
+            # l_SNP = [....]
+            # for etf in l_etf:
+            #   for stock in l_SNP:
+            #      pair = (etf,stock)
 
+            for pair in itertools.combinations(list(cluster), 2):  # runs through every pair within the cluster
 
                 t1 = current_window.get_data(universe=Universes.SNP,
                                              tickers=[pair[0]],
@@ -121,7 +134,7 @@ class Cointegrator:
                     mu_x_ann = float(250 * np.mean(r_x))
                     sigma_x_ann = float(250 ** 0.5 * np.std(r_x))
                     ou_mean, ou_std, ou_diffusion_v, recent_dev, recent_dev_scaled = self.__ou_params(residuals)
-                    scaled_beta = beta / (beta - 1)
+                    scaled_beta = beta / (beta - 1) #??????
                     recent_dev_scaled_hist = [recent_dev_scaled]
                     cointegration_rank = self.__score_coint(adf_test_statistic, self.adf_confidence_level,
                                                             adf_critical_values, he_test, hurst_exp_threshold, 10)
@@ -142,7 +155,13 @@ class Cointegrator:
         return current_cointegrated_pairs
 
     def __logged_lin_reg(self, x: DataFrame, y: DataFrame) -> Tuple[array, float, LinearRegression]:
-
+        """
+        The function runs a linear regression of log(y) on log(x) and returns a tuple:
+        The first element of the tuple is the residuals
+            (vector of the difference between fitted value of y and the actual value of y)
+        The second element of the tuple is the fitted beta of the regression
+        The third element if the LinearRegression().fit() it returns the whole model
+        """
         log_x = x.applymap(lambda k: np.log(k))
         log_y = y.applymap(lambda k: np.log(k))
 
@@ -153,17 +172,26 @@ class Cointegrator:
         return np.array(residuals), beta, reg_output
 
     def __log_returner(self, x: DataFrame) -> array:
+        """
+        returns an array of log returns as defined:
+        r_1 = ln(x_1)-ln(x_0)
+        """
         x = np.array(x)
         r_x = np.log(x[1:]) - np.log(x[:-1])
         return r_x
 
-    def __adf(self, residuals: array):
-        '''
+    def __adf(self, residuals: array) -> Tuple[float, Dict[str,float]]:
+        """
+        Performs Augmented Dickey-Fuller test for co-integration
+        Returns a tuple:
+        The first element is the test statistic
+        The second element is a dictionary of critical values at 1%,5%,10% confidence intervals
+
         critical values are in the following dictionary form:
             {'1%': -3.4304385694773387,
              '5%': -2.8615791461685034,
              '10%': -2.566790836162312}
-        '''
+        """
 
         adf_results = adfuller(residuals)
         adf_test_statistic: float = adf_results[0]
@@ -172,7 +200,12 @@ class Cointegrator:
         return adf_test_statistic, adf_critical_values
 
     def __hurst_exponent_test(self, residuals, current_window: Window) -> float:
-
+        """
+        The function performs hurst exponent test, where it looks at the variance of the difference between lagged returns
+        If a pair is co-integrated, then the variance should be close to the lag (think quadratic variation in GBM)
+        It then performs a regression of the variance on the lag to determine whether Beta coefficient is 2
+        Returns Beta/2
+        """
         # lag vector
         tau_vector = []
         # var[ (1 - L^n)y  ]
@@ -196,6 +229,11 @@ class Cointegrator:
 
     def __hl(self, residuals: array) -> float:
 
+        """
+        The function performs half-life co-integration test.
+        If the half_life
+
+        """
         # independent variable
         lagged_residuals = residuals[:-1]
         # dependent variable
@@ -208,7 +246,16 @@ class Cointegrator:
 
     def __ou_params(self, residuals: array) -> Tuple[float, float, float, float, float]:
         # We assume the residuals of a cointegrated pair is an OU process
-
+        """
+        The function assumes that residuals of a cointegrated pair os an OU process and returns a tuple:
+        The first element of the tuple: the mean or residuals is the mean of OU process
+        The second element of the tuple: the std of the residuals is the std of OU process (sigma)
+        It also runs a regression of residuals on lagged residuals. Then it looks at the vector of the errors of
+        this regression and takes their std to be OU process mean reversion parameter (v)
+        The third element of the tuple is this v
+        The forth element - the last residual
+        The fifth element - the last element scaled
+        """
         # independent variable
         lagged_residuals = residuals[:-1]
         # dependent variable
@@ -227,8 +274,11 @@ class Cointegrator:
 
     def __acceptance_rule(self, adf_test_statistic: float, adf_critical_values: Dict[str, float],
                           adf_confidence_level: AdfPrecisions, hl_test: float, max_mean_rev_time: int, he_test: float,
-                          hurst_exp_threshold: float):
-
+                          hurst_exp_threshold: float) -> bool:
+        """
+        the function compares the results of the tests with given thresholds and returns TRUE only if a pair passes
+        all tests
+        """
         adf = adf_test_statistic < adf_critical_values[adf_confidence_level.value]
         hl = hl_test < max_mean_rev_time
         he = he_test < hurst_exp_threshold
@@ -241,6 +291,7 @@ class Cointegrator:
                       hurst_stat: float,
                       hurst_threshold: float,
                       n_pair):
+        """?????"""
         # using score function to maximise number of profitable trades
         dist = abs(t_stat - crit_values[confidence_level.value])
         hurst = abs(hurst_stat - hurst_threshold)
@@ -249,16 +300,17 @@ class Cointegrator:
         delta = weights.numerator * dist + weights.denominator * hurst
         return delta
 
-    def get_previous_cointegrated_pairs(self, current_window):
-        # updating most recent z scores etc for pairs that qwe have already found to be cointegrated
+    def get_previous_cointegrated_pairs(self, current_window) -> List[CointegratedPair]:
+        """The function looks at the list of previously_cointegrated_pairs and updates their spread and z-score"""
+        # updating most recent z scores etc for pairs that we have already found to be cointegrated
 
         for coint_pair in self.previous_cointegrated_pairs:
             t1_most_recent = current_window.get_data(universe=Universes.SNP,
-                                                       tickers=[coint_pair.pair[0]],
-                                                       features=[Features.CLOSE]).iloc[-1:, :]
+                                                     tickers=[coint_pair.pair[0]],
+                                                     features=[Features.CLOSE]).iloc[-1:, :]
             t2_most_recent = current_window.get_data(universe=Universes.SNP,
-                                                       tickers=[coint_pair.pair[1]],
-                                                       features=[Features.CLOSE]).iloc[-1:, :]
+                                                     tickers=[coint_pair.pair[1]],
+                                                     features=[Features.CLOSE]).iloc[-1:, :]
 
             t1_latest_log_price = np.log(float(t1_most_recent.values[0][0]))
             t2_latest_log_price = np.log(float(t2_most_recent.values[0][0]))

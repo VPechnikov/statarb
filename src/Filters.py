@@ -21,10 +21,10 @@ from src.Cointegrator import CointegratedPair
 class Filters:
 
     def __init__(self, threshold_sigma = 1):
-        self.current_window = None
+        self.current_window: Window = None
         # historic data from which we calculate the history
         # volumes so we know what constitutes a shock)
-        self.threshold_sigma = threshold_sigma
+        self.threshold_sigma: float = threshold_sigma
         # how many stdvs away from mean we classify a shock - to be perturbed
 
     def run_volume_shock_filter_single_pair(self, pair, current_window):

@@ -46,11 +46,10 @@ class Window:
 
     def __update_window_data(self, trading_dates_to_get_data_for: List[date]):
         """
-        The function creates two new attribute of the window instance, namely self.etf_data and self.snp_data.
+        The function creates two new attributes of the window instance, namely self.etf_data and self.snp_data.
         It assigns them the DataFrame outputted from DataRepository.remove_dead_tickers().
         It first checks if any data has ever been uploaded, if not - uploads it from the disk.
-        Then, if the window ends after  ETF or SNP data's last day, it loads the data for the next window_len days.
-
+        Then, if the window ends after ETF or SNP data's last day, it loads the data for the next window_len days.
         """
         trading_dates_to_get_data_for = sorted(set(trading_dates_to_get_data_for))  # no duplicates
 
@@ -97,9 +96,7 @@ class Window:
                 return self.repository.all_dates[idx + n]
 
         print("The window start date was not in the list if all dates.")
-        print("Ensure backtest is started with a day that is in the datset.")
-
-        # small change to test Simone's git
+        print("Ensure backtest is started with a day that is in the dataset.")
 
     def get_data(self,
                  universe: Universes,
@@ -166,17 +163,11 @@ class Window:
 if __name__ == "__main__":
     win_length = timedelta(days=5)
     today = date(year=2008, month=1, day=2)
-    win = Window(window_start=today,
-                 trading_win_len=win_length,
-                 repository=DataRepository(win_length))
+    window = Window(window_start=today,
+                    trading_win_len=win_length,
+                    repository=DataRepository(win_length))
 
     days_rolled_forward = 0
     while days_rolled_forward <= 2 * win_length.days:
-        win.roll_forward_one_day()
-
-        if days_rolled_forward == 10:
-            y = 10
-        elif days_rolled_forward == 11:
-            z = 10
-
+        window.roll_forward_one_day()
         days_rolled_forward += 1
