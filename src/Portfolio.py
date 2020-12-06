@@ -87,9 +87,16 @@ class Portfolio:
         current cash will reduce by pair dedicated cash and commission fee
         active portfolio value will increase by this pair value
         """
-        cur_price = self.current_window.get_data(universe=Universes.SNP,
-                                                 tickers=[position.asset1, position.asset2],
+        df1 = self.current_window.get_data(universe=Universes.SNP, #Universes.ETFs
+                                                 tickers=[position.asset1],
                                                  features=[Features.CLOSE])
+        df2 = self.current_window.get_data(universe=Universes.ETFs,
+                                                 tickers=[position.asset2],
+                                                 features=[Features.CLOSE])
+
+        cur_price = pd.concat([df1, df2], axis=1)
+        #print(position.asset1)
+        #print(position.asset2)
         # notional reference amount for each pair. Actual positions are scaled accordingly with respect to
         # maximum weight as per below formula
         pair_dedicated_cash = self.init_cash * self.loading / max(abs(position.weight1), abs(position.weight2))
@@ -134,9 +141,14 @@ class Portfolio:
         also a commission fee is needed
         update pair residual cash, pnl, current cash, active portfolio value, realised pnl
         """
-        cur_price = self.current_window.get_data(universe=Universes.SNP,
-                                                 tickers=[position.asset1, position.asset2],
-                                                 features=[Features.CLOSE])
+        df1 = self.current_window.get_data(universe=Universes.SNP,
+                                           tickers=[position.asset1],
+                                           features=[Features.CLOSE])
+        df2 = self.current_window.get_data(universe=Universes.ETFs,
+                                           tickers=[position.asset2],
+                                           features=[Features.CLOSE])
+
+        cur_price = pd.concat([df1, df2], axis=1)
         if not (position in self.cur_positions):
             print("dont have this position open")
         else:
@@ -158,7 +170,8 @@ class Portfolio:
                              round(cur_price.iloc[-1, 0], 2), int(position.quantity1))
             self.logger.info('Asset 2: %s @$%s Quantity: %s', position.asset2,
                              round(cur_price.iloc[-1, 1], 2), int(position.quantity2))
-            self.logger.info('Realised PnL for position: %s' % round(position.pnl, 2))
+            print(position.pnl)
+            self.logger.info('Realised PnL for position: %s' % round(position.pnl[0], 2))
 
     def generate_commission(self, asset1_value, asset2_value):
         """
@@ -176,10 +189,16 @@ class Portfolio:
         cur_port_val = 0
 
         for pair in self.cur_positions:
-            todays_prices = self.current_window.get_data(universe=Universes.SNP,
-                                                         tickers=[pair.asset1, pair.asset2],
-                                                         features=[Features.CLOSE]).loc[today]
-
+            #todays_prices = self.current_window.get_data(universe=Universes.SNP,
+            #                                             tickers=[pair.asset1, pair.asset2],
+            #                                             features=[Features.CLOSE]).loc[today]
+            df3 = self.current_window.get_data(universe=Universes.SNP,  # Universes.ETFs
+                                               tickers=[pair.asset1],
+                                               features=[Features.CLOSE]).loc[today].values
+            df4 = self.current_window.get_data(universe=Universes.ETFs,
+                                               tickers=[pair.asset2],
+                                               features=[Features.CLOSE]).loc[today].values #
+            todays_prices = [df3, df4]
             asset_value = todays_prices[0] * pair.quantity1 + todays_prices[1] * pair.quantity2
             pair.update_position_pnl(asset_value, self.current_window)
             cur_port_val += asset_value
@@ -192,7 +211,7 @@ class Portfolio:
         self.port_hist.append([self.current_window.window_end, self.cur_cash, self.active_port_value,
                                self.cur_cash + self.active_port_value, self.realised_pnl, self.log_return * 100,
                                self.cum_return * 100, self.number_active_pairs])
-        print(f"Total Capital: {self.total_capital[-1]:.4f}\tCum Return: {self.cum_return:4f}")
+#        print(f"Total Capital: {self.total_capital[-1]:.4f}\tCum Return: {self.cum_return:4f}")
 
     def execute_trades(self, decisions):
         """

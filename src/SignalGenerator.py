@@ -5,6 +5,7 @@ from src.util.Features import PositionType
 from datetime import date, timedelta
 from src.Filters import Filters
 
+
 class Decision:
     def __init__(self, position: Position,
                  old_action: PositionType,
@@ -28,12 +29,13 @@ class SignalGenerator:
         self.time_stop_loss = 30
         self.open_count = 0
         self.natural_close_count = 0
-        self.emergency_close_count = 0
+        self.emergency_close_count = 0  # The number of previously cointegrated and traded pairs that are no longer cointegrated.
         self.time_stop_loss_count = 0
         self.filter = Filters()
         self.volumn_shock_filter = 0
 
-    def make_decision(self, pairs: List[CointegratedPair]) ->List[Decision]:
+
+    def make_decision(self, pairs: List[CointegratedPair]) -> List[Decision]:
         """
         The function:
         -Creates 2 lists: one with the tickers of the cointegrated pairs and one with the tickers of current position pairs
@@ -47,20 +49,21 @@ class SignalGenerator:
         -Returns a list with decisions for each pair(contains old action and new action on the pair)
         """
 
-        positions = self.port.cur_positions
-        current_posn_pairs = [(i.asset1, i.asset2) for i in positions]
-        coint_pairs = [i.pair for i in pairs]
+        positions = self.port.cur_positions  # the port.cur_positions has all the information of the pairs that are currnetly traded/open (tickers, weights, quantities,pnl, etc..
+        current_posn_pairs = [(i.asset1, i.asset2) for i in positions]  # return a list with the tickers of traded pairs
+        coint_pairs = [i.pair for i in pairs]  # a list with tickers of cointegrated pairs
         today = self.port.current_window.window_end
         decisions = []
         for coint_pair in pairs:
-        # if coint_pair not invested, check if we need to open position
+            # if coint_pair not invested, check if we need to open position
             if coint_pair.pair not in current_posn_pairs:
                 if coint_pair.recent_dev_scaled > self.entry_z:
                     # l = long pair = long x short y
                     p1, p2 = coint_pair.pair
                     shock = self.filter.run_volume_shock_filter_single_pair(coint_pair.pair,
-                                                                            self.port.current_window)
-                    if not shock:
+                                                                            self.port.current_window)  # If both etf and stock have shocks or none of them has shock,
+                    # shock is False, otherwise the shock = True meaning that only one of the two assets has a shock, so we do not continue with this trade.
+                    if not shock:  # if shock is an empty list then the condition (not shock) is True
                         decisions.append(
                             Decision(
                                 position=Position(
@@ -76,8 +79,10 @@ class SignalGenerator:
                             )
                         )
                         self.open_count += 1
+                        #print("Long")
+
                     else:
-                        self.volumn_shock_filter += 1
+                        self.volumn_shock_filter += 1  # It counts the cointegrated pairs with only one of the two assets having volume shock
 
                 elif coint_pair.recent_dev_scaled < - self.entry_z:
                     # s = short pair = long y short x
@@ -102,26 +107,29 @@ class SignalGenerator:
                             )
                         )
                         self.open_count += 1
+                        #print("short")
                     else:
                         self.volumn_shock_filter += 1
-
+                else:
+                    print("We don't open position")
+            #print(decisions)
         # loop through all invested position
         for position in positions:
-            position_pair = (position.asset1, position.asset2)
+            position_pair = (position.asset1, position.asset2)  # tickers
             # if pair not cointegrated, exit position
-            if  position_pair not in coint_pairs:
+            if position_pair not in coint_pairs:  # we check whether the pairs currently traded are still cointegrated. If they are not, we close the position.
                 decisions.append(
                     Decision(
                         position=position,
                         old_action=position.position_type,
                         new_action=PositionType.NOT_INVESTED))
-                self.emergency_close_count += 1
+                self.emergency_close_count += 1  # The number of previously cointegrated and traded pairs that are no longer cointegrated.
 
-            else:
+            else:  # they are still cointegrated
                 idx = coint_pairs.index(position_pair)
                 coint_pair = pairs[idx]
-                # if position passed time limit, exit position
-                # if recent_dev is still high, position will be opened again tmr, so don't exit in such situation
+                # if position passed time limit and recent_dev has not reached exit_z, but the trade is stil profitable close the trade.
+                # In case we pass the time limit but we have losses because we are between emergency_delta_z and entry z in absolute values we don't close the trade.
                 if today > (position.init_date + timedelta(self.time_stop_loss)) and \
                         (abs(coint_pair.recent_dev_scaled) < self.entry_z):
                     decisions.append(
@@ -129,13 +137,13 @@ class SignalGenerator:
                             position=position,
                             old_action=position.position_type,
                             new_action=PositionType.NOT_INVESTED))
-                    self.time_stop_loss_count += 1
+                    self.time_stop_loss_count += 1  # counts the number of trades closed because we reached the time limit.
                 # else, check if need to exit
                 else:
                     if position.position_type is PositionType.LONG:
-                        natural_close_required = coint_pair.recent_dev_scaled < self.exit_z
+                        natural_close_required = coint_pair.recent_dev_scaled < self.exit_z  # close with profit
                         emergency_close_required = coint_pair.recent_dev_scaled > \
-                                                   (self.emergency_delta_z + position.init_z)
+                                                   (self.emergency_delta_z + position.init_z)  # close with loss !!!! why do we add the init_z ?????
 
                         if natural_close_required or emergency_close_required:
                             decisions.append(
@@ -147,7 +155,7 @@ class SignalGenerator:
                             if natural_close_required:
                                 self.natural_close_count += 1
                             else:
-                                self.emergency_close_count += 1
+                                self.emergency_close_count += 1  # closed trades with loss due to z-score above 3 (stop loss count)
                         else:
                             # no need to close, so keep the position open
                             decisions.append(
@@ -159,9 +167,10 @@ class SignalGenerator:
 
                     elif position.position_type is PositionType.SHORT:
 
-                        natural_close_required = coint_pair.recent_dev_scaled > -self.exit_z
+                        natural_close_required = coint_pair.recent_dev_scaled > -self.exit_z  # profit
                         emergency_close_required = coint_pair.recent_dev_scaled < \
-                                                   (position.init_z - self.emergency_delta_z)
+                                                   (
+                                                               position.init_z - self.emergency_delta_z)  # stop loss !!!!!!!!!! Why -self.emergency_delta_z, only if emergency_delta_z is 0.8 and init_z = -2.2
 
                         if natural_close_required or emergency_close_required:
                             decisions.append(

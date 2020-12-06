@@ -102,6 +102,10 @@ class PairTrader:
                 if is_window_end_or_halfway or self.last_traded_date is None:
                     print("Clustering...")
                     clusters = self.clusterer.dbscan(self.today, eps=0.0925, min_samples=2, window=self.current_window)
+                    #print(clusters)
+                    #for keys in clusters.keys():
+                     #   for ticker in clusters[keys]:
+                      #      print(type(ticker))
                     print("Cointegrating...")
                     cointegrated_pairs = self.cointegrator.generate_pairs(clusters,
                                                                           self.hurst_exp_threshold,

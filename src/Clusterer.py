@@ -1,12 +1,11 @@
 import numpy as np
 import pandas as pd
-from typing import Dict, Tuple
+from typing import Dict
 
+from networkx.drawing.tests.test_pylab import plt
 
 pd.options.display.max_columns = None
 pd.options.display.max_rows = None
-
-from src.util.Tickers import Tickers
 from sklearn.cluster import DBSCAN
 from src.DataRepository import Universes
 from src.util.Features import Features
@@ -28,7 +27,7 @@ class Clusterer:
 
         self.cluster_history = []
 
-    def dbscan(self, today: date, min_samples, eps=None, window=None) -> Dict[int, Tuple[Tuple[Tickers]]]:
+    def dbscan(self, today: date, min_samples, eps=None, window=None):
         """
         It takes as parameters:
         today: is the today date
@@ -107,13 +106,13 @@ class Clusterer:
 
         return clusters
 
-# if __name__ == '__main__':
-#
-#     X = pd.concat([normed_volume_ranks, normed_intraday_vol_ranks], axis=1)
-#
-#     plt.figure()
-#     plt.scatter(x=X.loc[:, 0], y=X.loc[:, 1])
-#     plt.xlabel(str(X.columns[0]))
-#     plt.ylabel(str(X.columns[1]))
-#     plt.tight_layout()
-#     plt.show()
+#if __name__ == '__main__':
+
+#       X = pd.concat([normed_volume_ranks, normed_intraday_vol_ranks], axis=1)
+
+#    plt.figure()
+#    plt.scatter(x=X.loc[:, 0], y=X.loc[:, 1])
+#    plt.xlabel(str(X.columns[0]))
+#    plt.ylabel(str(X.columns[1]))
+#    plt.tight_layout()
+#    plt.show()

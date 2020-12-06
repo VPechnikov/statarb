@@ -13,7 +13,7 @@ from src.DataRepository import DataRepository
 from src.DataRepository import Universes
 from src.Window import Window
 from src.util.Features import Features
-from src.util.Tickers import Tickers
+from src.util.Tickers import Tickers, SnpTickers, EtfTickers
 from src.util.util import get_universe_from_ticker
 
 
@@ -73,17 +73,18 @@ class Cointegrator:
         self.exit_z: float = exit_z
         self.previous_cointegrated_pairs: List[CointegratedPair] = previous_cointegrated_pairs
 
+
     def generate_pairs(self,
                        clustering_results: Dict[int, Tuple[Tuple[Tickers]]],
                        hurst_exp_threshold: float, current_window: Window) -> List[CointegratedPair]:
-        """
-        The function generates pairs by considering every combination of 2 elements of a cluster.
-        Then it regresses one on the other to determine beta, residuals and regression output
-        Then it performs the three tests on this pair
-        If cointegrated, we increase the number of cointegrated pairs and creates an instance of a cointegrated pair
-        with the required attributes
-        Updates Cointegrator.previous_cointegrated_pairs and returns a list of Cointegrated Pairs
-        """
+
+        #The function generates pairs by considering every combination of 2 elements of a cluster.
+        #Then it regresses one on the other to determine beta, residuals and regression output
+        #Then it performs the three tests on this pair
+        #If cointegrated, we increase the number of cointegrated pairs and creates an instance of a cointegrated pair
+        #with the required attributes
+        #Updates Cointegrator.previous_cointegrated_pairs and returns a list of Cointegrated Pairs
+
         # run cointegration_analysis on all poss combinations of pairs within the same cluster
 
         current_cointegrated_pairs = []
@@ -91,68 +92,84 @@ class Cointegrator:
         tickers_per_cluster = [i for i in clustering_results.values()]
 
         for cluster in tickers_per_cluster:
-            #FOR YOU BOYS
+            # FOR YOU BOYS
             # l_ETF = [....]
             # l_SNP = [....]
             # for etf in l_etf:
             #   for stock in l_SNP:
             #      pair = (etf,stock)
+            #print(cluster)
+            #for pair in itertools.combinations(list(cluster), 2):  # runs through every pair within the cluster
+            for i in cluster:
+                if type(i) == SnpTickers:
+                    #for j in range(cluster.tolist().index(np.where(type(cluster) == EtfTickers)),len(cluster)):
+                    #k = -1
+                    for j in reversed(cluster):
+                    #while type(list(cluster)[k]) == EtfTickers:
+                        if type(j) == EtfTickers:
+                            pair: List[Tuple[Tickers]] = [list(cluster)[list(cluster).index(i)], list(cluster)[list(cluster).index(j)]]
+                            #print(pair)
+                            t1 = current_window.get_data(universe=Universes.SNP,
+                                                         tickers=[pair[0]],
+                                                         features=[Features.CLOSE])
+                            t2 = current_window.get_data(universe=Universes.ETFs,
+                                                         tickers=[pair[1]],
+                                                         features=[Features.CLOSE])
+                            #print(t1, t2)
 
-            for pair in itertools.combinations(list(cluster), 2):  # runs through every pair within the cluster
+                            # t1 = current_window.get_data(universe=get_universe_from_ticker(pair[0]),
+                            #                              tickers=[pair[0]],
+                            #                              features=[Features.CLOSE])
+                            # t2 = current_window.get_data(universe=get_universe_from_ticker(pair[1]),
+                            #                              tickers=[pair[1]],
+                            #                              features=[Features.CLOSE])
 
-                t1 = current_window.get_data(universe=Universes.SNP,
-                                             tickers=[pair[0]],
-                                             features=[Features.CLOSE])
-                t2 = current_window.get_data(universe=Universes.SNP,
-                                             tickers=[pair[1]],
-                                             features=[Features.CLOSE])
+                            try:
+                                # sometimes there are no price data, in which case, skip
+                                residuals, beta, reg_output = self.__logged_lin_reg(t1, t2)
+                            except ValueError:
+                                continue
+                            # for some reason residuals is a (60,1) array not (60,) array when i run the code so have changed input to residuals.flatten
+                            adf_test_statistic, adf_critical_values = self.__adf(residuals.flatten())
+                            hl_test = self.__hl(residuals)
+                            he_test = self.__hurst_exponent_test(residuals, current_window)
 
-                # t1 = current_window.get_data(universe=get_universe_from_ticker(pair[0]),
-                #                              tickers=[pair[0]],
-                #                              features=[Features.CLOSE])
-                # t2 = current_window.get_data(universe=get_universe_from_ticker(pair[1]),
-                #                              tickers=[pair[1]],
-                #                              features=[Features.CLOSE])
+                            is_cointegrated = self.__acceptance_rule(adf_test_statistic, adf_critical_values,
+                                                                     self.adf_confidence_level, hl_test, self.max_mean_rev_time,
+                                                                     he_test, hurst_exp_threshold)
 
-                try:
-                    # sometimes there are no price data, in which case, skip
-                    residuals, beta, reg_output = self.__logged_lin_reg(t1, t2)
-                except ValueError:
-                    continue
-                # for some reason residuals is a (60,1) array not (60,) array when i run the code so have changed input to residuals.flatten
-                adf_test_statistic, adf_critical_values = self.__adf(residuals.flatten())
-                hl_test = self.__hl(residuals)
-                he_test = self.__hurst_exponent_test(residuals, current_window)
+                            if is_cointegrated:
+                                #print(pair)
+                                n_cointegrated += 1
+                                r_x = self.__log_returner(t1)
+                                mu_x_ann = float(250 * np.mean(r_x))
+                                sigma_x_ann = float(250 ** 0.5 * np.std(r_x))
+                                ou_mean, ou_std, ou_diffusion_v, recent_dev, recent_dev_scaled = self.__ou_params(residuals)
+                                scaled_beta = beta / (beta - 1)  # ??????
+                                recent_dev_scaled_hist = [recent_dev_scaled]
+                                cointegration_rank = self.__score_coint(adf_test_statistic, self.adf_confidence_level,
+                                                                        adf_critical_values, he_test, hurst_exp_threshold, 10)
+                                current_cointegrated_pairs.append(
+                                    CointegratedPair(pair, mu_x_ann, sigma_x_ann, reg_output, scaled_beta,
+                                                     hl_test, ou_mean, ou_std, ou_diffusion_v,
+                                                     recent_dev, recent_dev_scaled,
+                                                     recent_dev_scaled_hist, cointegration_rank))
 
-                is_cointegrated = self.__acceptance_rule(adf_test_statistic, adf_critical_values,
-                                                         self.adf_confidence_level, hl_test, self.max_mean_rev_time,
-                                                         he_test, hurst_exp_threshold)
+                                if n_cointegrated == self.target_number_of_coint_pairs:
+                                    current_cointegrated_pairs = sorted(current_cointegrated_pairs,
+                                                                        key=lambda coint_pair: coint_pair.cointegration_rank,
+                                                                        reverse=True)
+                                    self.previous_cointegrated_pairs = current_cointegrated_pairs
+                                    print(n_cointegrated)
+                                    return current_cointegrated_pairs
+                        else:
+                            break
 
-                if is_cointegrated:
-                    n_cointegrated += 1
-                    r_x = self.__log_returner(t1)
-                    mu_x_ann = float(250 * np.mean(r_x))
-                    sigma_x_ann = float(250 ** 0.5 * np.std(r_x))
-                    ou_mean, ou_std, ou_diffusion_v, recent_dev, recent_dev_scaled = self.__ou_params(residuals)
-                    scaled_beta = beta / (beta - 1) #??????
-                    recent_dev_scaled_hist = [recent_dev_scaled]
-                    cointegration_rank = self.__score_coint(adf_test_statistic, self.adf_confidence_level,
-                                                            adf_critical_values, he_test, hurst_exp_threshold, 10)
-                    current_cointegrated_pairs.append(
-                        CointegratedPair(pair, mu_x_ann, sigma_x_ann, reg_output, scaled_beta,
-                                         hl_test, ou_mean, ou_std, ou_diffusion_v,
-                                         recent_dev, recent_dev_scaled,
-                                         recent_dev_scaled_hist, cointegration_rank))
-
-                    if n_cointegrated == self.target_number_of_coint_pairs:
-                        current_cointegrated_pairs = sorted(current_cointegrated_pairs,
-                                                            key=lambda coint_pair: coint_pair.cointegration_rank,
-                                                            reverse=True)
-                        self.previous_cointegrated_pairs = current_cointegrated_pairs
-                        return current_cointegrated_pairs
-
+                else:
+                    break
         self.previous_cointegrated_pairs = current_cointegrated_pairs
         return current_cointegrated_pairs
+
 
     def __logged_lin_reg(self, x: DataFrame, y: DataFrame) -> Tuple[array, float, LinearRegression]:
         """
@@ -180,7 +197,7 @@ class Cointegrator:
         r_x = np.log(x[1:]) - np.log(x[:-1])
         return r_x
 
-    def __adf(self, residuals: array) -> Tuple[float, Dict[str,float]]:
+    def __adf(self, residuals: array) -> Tuple[float, Dict[str, float]]:
         """
         Performs Augmented Dickey-Fuller test for co-integration
         Returns a tuple:
@@ -308,7 +325,7 @@ class Cointegrator:
             t1_most_recent = current_window.get_data(universe=Universes.SNP,
                                                      tickers=[coint_pair.pair[0]],
                                                      features=[Features.CLOSE]).iloc[-1:, :]
-            t2_most_recent = current_window.get_data(universe=Universes.SNP,
+            t2_most_recent = current_window.get_data(universe=Universes.ETFs,
                                                      tickers=[coint_pair.pair[1]],
                                                      features=[Features.CLOSE]).iloc[-1:, :]
 
