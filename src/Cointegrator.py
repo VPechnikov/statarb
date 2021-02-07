@@ -16,6 +16,13 @@ from src.util.Features import Features
 from src.util.Tickers import Tickers, SnpTickers, EtfTickers
 from src.util.util import get_universe_from_ticker
 
+# To do list
+# check the print messages
+# put timer in regression and tests
+# Create one function which finds snp and etf pairs and put them in the Queue
+# Create a target function which first gets the data for the pair and then the process for identifying cointegration takes place
+# multi-threading of the 3 tests
+
 
 class CointegratedPair:
 
@@ -92,12 +99,6 @@ class Cointegrator:
         tickers_per_cluster = [i for i in clustering_results.values()]
 
         for cluster in tickers_per_cluster:
-            # FOR YOU BOYS
-            # l_ETF = [....]
-            # l_SNP = [....]
-            # for etf in l_etf:
-            #   for stock in l_SNP:
-            #      pair = (etf,stock)
             #print(cluster)
             #for pair in itertools.combinations(list(cluster), 2):  # runs through every pair within the cluster
             for i in cluster:
@@ -107,7 +108,8 @@ class Cointegrator:
                     for j in reversed(cluster):
                     #while type(list(cluster)[k]) == EtfTickers:
                         if type(j) == EtfTickers:
-                            pair: List[Tuple[Tickers]] = [list(cluster)[list(cluster).index(i)], list(cluster)[list(cluster).index(j)]]
+                            #pair: List[Tuple[Tickers]] = #[list(cluster)[list(cluster).index(i)], list(cluster)[list(cluster).index(j)]]
+                            pair = [i,j]
                             #print(pair)
                             t1 = current_window.get_data(universe=Universes.SNP,
                                                          tickers=[pair[0]],
@@ -139,7 +141,7 @@ class Cointegrator:
                                                                      he_test, hurst_exp_threshold)
 
                             if is_cointegrated:
-                                #print(pair)
+
                                 n_cointegrated += 1
                                 r_x = self.__log_returner(t1)
                                 mu_x_ann = float(250 * np.mean(r_x))
