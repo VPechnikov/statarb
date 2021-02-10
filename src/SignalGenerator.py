@@ -110,9 +110,7 @@ class SignalGenerator:
                         #print("short")
                     else:
                         self.volumn_shock_filter += 1
-                else:
-                    print("We don't open position")
-            #print(decisions)
+
         # loop through all invested position
         for position in positions:
             position_pair = (position.asset1, position.asset2)  # tickers

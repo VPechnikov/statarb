@@ -107,7 +107,7 @@ class PairTrader:
                      #   for ticker in clusters[keys]:
                       #      print(type(ticker))
                     print("Cointegrating...")
-                    cointegrated_pairs = self.cointegrator.generate_pairs(clusters,
+                    cointegrated_pairs = self.cointegrator.parallel_generate_pairs(clusters,
                                                                           self.hurst_exp_threshold,
                                                                           self.current_window) #Valentin fix pls
 

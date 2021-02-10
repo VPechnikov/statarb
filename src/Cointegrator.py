@@ -14,12 +14,11 @@ from src.DataRepository import Universes
 from src.Window import Window
 from src.util.Features import Features
 from src.util.Tickers import Tickers, SnpTickers, EtfTickers
+import time
+import multiprocessing as mp
 from src.util.util import get_universe_from_ticker
 
 # To do list
-# check the print messages
-# put timer in regression and tests
-# Create one function which finds snp and etf pairs and put them in the Queue
 # Create a target function which first gets the data for the pair and then the process for identifying cointegration takes place
 # multi-threading of the 3 tests
 
@@ -81,6 +80,88 @@ class Cointegrator:
         self.previous_cointegrated_pairs: List[CointegratedPair] = previous_cointegrated_pairs
 
 
+    def load_queue(self,
+                   clustering_results: Dict[int, Tuple[Tuple[Tickers]]]):
+        manager = mp.Manager()
+        queue = manager.Queue()
+
+        current_cointegrated_pairs = []
+        tickers_per_cluster = [i for i in clustering_results.values()]
+        for cluster in tickers_per_cluster:
+            for i in cluster:
+                if type(i) == SnpTickers:
+                    for j in reversed(cluster):
+                        if type(j) == EtfTickers:
+                            pair = [i, j]
+                            queue.put(pair)
+        return queue
+
+    def regression_tests(self, hurst_exp_threshold: float, current_window: Window,
+                         queue, results_queue):
+        while not queue.empty():
+            pair = queue.get()
+            t1 = current_window.get_data(universe=Universes.SNP,
+                                         tickers=[pair[0]],
+                                         features=[Features.CLOSE])
+            t2 = current_window.get_data(universe=Universes.ETFs,
+                                         tickers=[pair[1]],
+                                         features=[Features.CLOSE])
+            try:
+                residuals, beta, reg_output = self.__logged_lin_reg(t1, t2)
+            except:
+                pass
+            # for some reason residuals is a (60,1) array not (60,) array when i run the code so have changed input to residuals.flatten
+            adf_test_statistic, adf_critical_values = self.__adf(residuals.flatten())
+            hl_test = self.__hl(residuals)
+            he_test = self.__hurst_exponent_test(residuals, current_window)
+            is_cointegrated = self.__acceptance_rule(adf_test_statistic, adf_critical_values,
+                                                     self.adf_confidence_level, hl_test, self.max_mean_rev_time,
+                                                     he_test, hurst_exp_threshold)
+
+            if is_cointegrated:
+                r_x = self.__log_returner(t1)
+                mu_x_ann = float(250 * np.mean(r_x))
+                sigma_x_ann = float(250 ** 0.5 * np.std(r_x))
+                ou_mean, ou_std, ou_diffusion_v, recent_dev, recent_dev_scaled = self.__ou_params(residuals)
+                scaled_beta = beta / (beta - 1)  # ??????
+                recent_dev_scaled_hist = [recent_dev_scaled]
+                cointegration_rank = self.__score_coint(adf_test_statistic, self.adf_confidence_level,
+                                                        adf_critical_values, he_test, hurst_exp_threshold, 10)
+                cointegrated_pair = CointegratedPair(pair, mu_x_ann, sigma_x_ann, reg_output, scaled_beta,
+                                                         hl_test, ou_mean, ou_std, ou_diffusion_v,
+                                                         recent_dev, recent_dev_scaled,
+                                                         recent_dev_scaled_hist, cointegration_rank)
+                results_queue.put(cointegrated_pair)
+
+    def parallel_generate_pairs(self,
+                                clustering_results: Dict[int, Tuple[Tuple[Tickers]]],
+                                hurst_exp_threshold: float, current_window: Window):
+        current_cointegrated_pairs = []
+        num_processes = mp.cpu_count()
+        processes = []
+        pair_queue = self.load_queue(clustering_results)
+        result_queue = mp.Manager().Queue()
+        n_cointegrated = 0
+        for i in range(num_processes):
+            new_process = mp.Process(target=self.regression_tests, args=(hurst_exp_threshold, current_window, pair_queue
+                                                                         , result_queue))
+            processes.append(new_process)
+            new_process.start()
+
+        for p in processes:
+            p.join()
+
+        while not result_queue.empty():
+            n_cointegrated += 1
+            current_cointegrated_pairs.append(result_queue.get())
+
+            if n_cointegrated == self.target_number_of_coint_pairs:
+                current_cointegrated_pairs = sorted(current_cointegrated_pairs,
+                                                    key=lambda coint_pair: coint_pair.cointegration_rank,
+                                                    reverse=True)
+                self.previous_cointegrated_pairs = current_cointegrated_pairs
+                return current_cointegrated_pairs
+
     def generate_pairs(self,
                        clustering_results: Dict[int, Tuple[Tuple[Tickers]]],
                        hurst_exp_threshold: float, current_window: Window) -> List[CointegratedPair]:
@@ -97,7 +178,8 @@ class Cointegrator:
         current_cointegrated_pairs = []
         n_cointegrated = 0
         tickers_per_cluster = [i for i in clustering_results.values()]
-
+        t_reg = 0
+        t_test = 0
         for cluster in tickers_per_cluster:
             #print(cluster)
             #for pair in itertools.combinations(list(cluster), 2):  # runs through every pair within the cluster
@@ -128,14 +210,19 @@ class Cointegrator:
 
                             try:
                                 # sometimes there are no price data, in which case, skip
+                                t_1 = time.time()
                                 residuals, beta, reg_output = self.__logged_lin_reg(t1, t2)
+                                t_2 = time.time()
+                                t_reg += t_2 - t_1
                             except ValueError:
                                 continue
                             # for some reason residuals is a (60,1) array not (60,) array when i run the code so have changed input to residuals.flatten
+                            t_3 = time.time()
                             adf_test_statistic, adf_critical_values = self.__adf(residuals.flatten())
                             hl_test = self.__hl(residuals)
                             he_test = self.__hurst_exponent_test(residuals, current_window)
-
+                            t_4 = time.time()
+                            t_test += t_4 - t_3
                             is_cointegrated = self.__acceptance_rule(adf_test_statistic, adf_critical_values,
                                                                      self.adf_confidence_level, hl_test, self.max_mean_rev_time,
                                                                      he_test, hurst_exp_threshold)
@@ -163,12 +250,16 @@ class Cointegrator:
                                                                         reverse=True)
                                     self.previous_cointegrated_pairs = current_cointegrated_pairs
                                     print(n_cointegrated)
+                                    print(t_reg)
+                                    print(t_test)
                                     return current_cointegrated_pairs
                         else:
                             break
 
                 else:
                     break
+        print(t_reg)
+        print(t_test)
         self.previous_cointegrated_pairs = current_cointegrated_pairs
         return current_cointegrated_pairs
 
