@@ -1,8 +1,5 @@
 import numpy as np
 import pandas as pd
-from typing import Dict
-
-from networkx.drawing.tests.test_pylab import plt
 
 pd.options.display.max_columns = None
 pd.options.display.max_rows = None
