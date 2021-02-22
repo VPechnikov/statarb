@@ -170,7 +170,7 @@ class Portfolio:
                              round(cur_price.iloc[-1, 0], 2), int(position.quantity1))
             self.logger.info('Asset 2: %s @$%s Quantity: %s', position.asset2,
                              round(cur_price.iloc[-1, 1], 2), int(position.quantity2))
-            print(position.pnl)
+            #print(position.pnl)
             self.logger.info('Realised PnL for position: %s' % round(position.pnl[0], 2))
 
     def generate_commission(self, asset1_value, asset2_value):

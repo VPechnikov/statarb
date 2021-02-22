@@ -101,7 +101,7 @@ class Cointegrator:
                          queue, results_queue):
         while not queue.empty():
             pair = queue.get()
-            print("Process {} got pair {} from the initial queue".format(os.getpid(), pair))
+            #print("Process {} got pair {} from the initial queue".format(os.getpid(), pair))
             t1 = current_window.get_data(universe=Universes.SNP,
                                          tickers=[pair[0]],
                                          features=[Features.CLOSE])
@@ -110,7 +110,7 @@ class Cointegrator:
                                          features=[Features.CLOSE])
             try:
                 residuals, beta, reg_output = self.__logged_lin_reg(t1, t2)
-                print("Process {} performs the regression".format(os.getpid()))
+                #print("Process {} performs the regression".format(os.getpid()))
             except:
                 pass
             # for some reason residuals is a (60,1) array not (60,) array when i run the code so have changed input to residuals.flatten
@@ -135,7 +135,7 @@ class Cointegrator:
                                                          recent_dev, recent_dev_scaled,
                                                          recent_dev_scaled_hist, cointegration_rank)
                 results_queue.put(cointegrated_pair)
-                print("Process {} placed pair {} in the result queue".format(os.getpid(), pair))
+                #print("Process {} placed pair {} in the result queue".format(os.getpid(), pair))
     def parallel_generate_pairs(self,
                                 clustering_results: Dict[int, Tuple[Tuple[Tickers]]],
                                 hurst_exp_threshold: float, current_window: Window):

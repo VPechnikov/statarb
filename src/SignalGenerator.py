@@ -141,7 +141,7 @@ class SignalGenerator:
                     if position.position_type is PositionType.LONG:
                         natural_close_required = coint_pair.recent_dev_scaled < self.exit_z  # close with profit
                         emergency_close_required = coint_pair.recent_dev_scaled > \
-                                                   (self.emergency_delta_z + position.init_z)  # close with loss !!!! why do we add the init_z ?????
+                                                   (self.emergency_delta_z + position.init_z)  # close with loss !!!!
 
                         if natural_close_required or emergency_close_required:
                             decisions.append(
@@ -168,7 +168,7 @@ class SignalGenerator:
                         natural_close_required = coint_pair.recent_dev_scaled > -self.exit_z  # profit
                         emergency_close_required = coint_pair.recent_dev_scaled < \
                                                    (
-                                                               position.init_z - self.emergency_delta_z)  # stop loss !!!!!!!!!! Why -self.emergency_delta_z, only if emergency_delta_z is 0.8 and init_z = -2.2
+                                                               position.init_z - self.emergency_delta_z)  # stop loss !!!!!!!!!!
 
                         if natural_close_required or emergency_close_required:
                             decisions.append(
