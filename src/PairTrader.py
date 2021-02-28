@@ -109,7 +109,7 @@ class PairTrader:
                     print("Cointegrating...")
                     cointegrated_pairs = self.cointegrator.parallel_generate_pairs(clusters,
                                                                           self.hurst_exp_threshold,
-                                                                          self.current_window) #Valentin fix pls
+                                                                          self.current_window)
 
                 # we make an assumption that they are still co-integrated. Need to check
                 # change the cointegrater to look only for SNP/ETF pairs to reduce the running time from

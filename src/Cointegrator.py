@@ -101,7 +101,7 @@ class Cointegrator:
                          queue, results_queue):
         while not queue.empty():
             pair = queue.get()
-            print("Process {} got pair {} from the initial queue".format(os.getpid(), pair))
+            #print("Process {} got pair {} from the initial queue".format(os.getpid(), pair))
             t1 = current_window.get_data(universe=Universes.SNP,
                                          tickers=[pair[0]],
                                          features=[Features.CLOSE])
@@ -110,33 +110,36 @@ class Cointegrator:
                                          features=[Features.CLOSE])
             try:
                 residuals, beta, reg_output = self.__logged_lin_reg(t1, t2)
-                print("Process {} performs the regression".format(os.getpid()))
+                #print("Process {} performs the regression".format(os.getpid()))
             except:
+                print("It passed")
                 pass
             # for some reason residuals is a (60,1) array not (60,) array when i run the code so have changed input to residuals.flatten
-            adf_test_statistic, adf_critical_values = self.__adf(residuals.flatten())
-            #if adf_test_statistic < adf_critical_values[adf_confidence_level.value]:
             hl_test = self.__hl(residuals)
-            he_test = self.__hurst_exponent_test(residuals, current_window)
-            is_cointegrated = self.__acceptance_rule(adf_test_statistic, adf_critical_values,
-                                                     self.adf_confidence_level, hl_test, self.max_mean_rev_time,
-                                                     he_test, hurst_exp_threshold)
+            if hl_test < self.max_mean_rev_time:
+                adf_test_statistic, adf_critical_values = self.__adf(residuals.flatten())
+                if adf_test_statistic < adf_critical_values[self.adf_confidence_level.value]:
+                    he_test = self.__hurst_exponent_test(residuals, current_window)
+                    if he_test < hurst_exp_threshold:
 
-            if is_cointegrated:
-                r_x = self.__log_returner(t1)
-                mu_x_ann = float(250 * np.mean(r_x))
-                sigma_x_ann = float(250 ** 0.5 * np.std(r_x))
-                ou_mean, ou_std, ou_diffusion_v, recent_dev, recent_dev_scaled = self.__ou_params(residuals)
-                scaled_beta = beta / (beta - 1)  # because we are taking a long and a short position
-                recent_dev_scaled_hist = [recent_dev_scaled]
-                cointegration_rank = self.__score_coint(adf_test_statistic, self.adf_confidence_level,
-                                                        adf_critical_values, he_test, hurst_exp_threshold, 10)
-                cointegrated_pair = CointegratedPair(pair, mu_x_ann, sigma_x_ann, reg_output, scaled_beta,
-                                                         hl_test, ou_mean, ou_std, ou_diffusion_v,
-                                                         recent_dev, recent_dev_scaled,
-                                                         recent_dev_scaled_hist, cointegration_rank)
-                results_queue.put(cointegrated_pair)
-                print("Process {} placed pair {} in the result queue".format(os.getpid(), pair))
+            #is_cointegrated = self.__acceptance_rule(adf_test_statistic, adf_critical_values,
+            #                                         self.adf_confidence_level, hl_test, self.max_mean_rev_time,
+            #                                         he_test, hurst_exp_threshold)
+            #if is_cointegrated:
+                        r_x = self.__log_returner(t1)
+                        mu_x_ann = float(250 * np.mean(r_x))
+                        sigma_x_ann = float(250 ** 0.5 * np.std(r_x))
+                        ou_mean, ou_std, ou_diffusion_v, recent_dev, recent_dev_scaled = self.__ou_params(residuals)
+                        scaled_beta = beta / (beta - 1)  # because we are taking a long and a short position
+                        recent_dev_scaled_hist = [recent_dev_scaled]
+                        cointegration_rank = self.__score_coint(adf_test_statistic, self.adf_confidence_level,
+                                                                adf_critical_values, he_test, hurst_exp_threshold, 10)
+                        cointegrated_pair = CointegratedPair(pair, mu_x_ann, sigma_x_ann, reg_output, scaled_beta,
+                                                                 hl_test, ou_mean, ou_std, ou_diffusion_v,
+                                                                 recent_dev, recent_dev_scaled,
+                                                                 recent_dev_scaled_hist, cointegration_rank)
+                        results_queue.put(cointegrated_pair)
+                        #print("Process {} placed pair {} in the result queue".format(os.getpid(), pair))
     def parallel_generate_pairs(self,
                                 clustering_results: Dict[int, Tuple[Tuple[Tickers]]],
                                 hurst_exp_threshold: float, current_window: Window):
