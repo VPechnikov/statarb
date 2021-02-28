@@ -87,7 +87,7 @@ class Cointegrator:
         queue = manager.Queue()
 
         current_cointegrated_pairs = []
-        tickers_per_cluster = [i for i in clustering_results.values()]
+        tickers_per_cluster = [clustering_results[key] for key in clustering_results.keys() if key != -1]
         for cluster in tickers_per_cluster:
             for i in cluster:
                 if type(i) == SnpTickers:
@@ -138,8 +138,11 @@ class Cointegrator:
                                                                  hl_test, ou_mean, ou_std, ou_diffusion_v,
                                                                  recent_dev, recent_dev_scaled,
                                                                  recent_dev_scaled_hist, cointegration_rank)
-                        results_queue.put(cointegrated_pair)
-                        #print("Process {} placed pair {} in the result queue".format(os.getpid(), pair))
+                        if not results_queue.full():
+                            results_queue.put(cointegrated_pair)
+                        else:
+                            break
+
     def parallel_generate_pairs(self,
                                 clustering_results: Dict[int, Tuple[Tuple[Tickers]]],
                                 hurst_exp_threshold: float, current_window: Window):
@@ -147,16 +150,13 @@ class Cointegrator:
         num_processes = mp.cpu_count()
         processes = []
         pair_queue = self.load_queue(clustering_results)
-        result_queue = mp.Manager().Queue()
+        result_queue = mp.Manager().Queue(maxsize=self.target_number_of_coint_pairs)
         n_cointegrated = 0
         for i in range(num_processes):
             new_process = mp.Process(target=self.regression_tests, args=(hurst_exp_threshold, current_window, pair_queue
                                                                          , result_queue))
             processes.append(new_process)
             new_process.start()
-
-        for p in processes:
-            p.join()
 
         while not result_queue.empty():
             n_cointegrated += 1
@@ -167,7 +167,11 @@ class Cointegrator:
                                                     key=lambda coint_pair: coint_pair.cointegration_rank,
                                                     reverse=True)
                 self.previous_cointegrated_pairs = current_cointegrated_pairs
-                return current_cointegrated_pairs
+
+        for p in processes:
+            p.join()
+
+        return current_cointegrated_pairs
 
     def generate_pairs(self,
                        clustering_results: Dict[int, Tuple[Tuple[Tickers]]],

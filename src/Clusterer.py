@@ -102,14 +102,3 @@ class Clusterer:
             clusters[cluster_num] = tickers_in_this_cluster.values
 
         return clusters
-
-#if __name__ == '__main__':
-
-#       X = pd.concat([normed_volume_ranks, normed_intraday_vol_ranks], axis=1)
-
-#    plt.figure()
-#    plt.scatter(x=X.loc[:, 0], y=X.loc[:, 1])
-#    plt.xlabel(str(X.columns[0]))
-#    plt.ylabel(str(X.columns[1]))
-#    plt.tight_layout()
-#    plt.show()
